@@ -44,13 +44,7 @@ body {
 
 /* ══ HERO WELCOME ══ */
 #heroScreen {
-  position: fixed; inset: 0;
-  background: var(--bg-dark);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  z-index: 300;
-  text-align: center;
-  padding: 2rem;
+  display: none !important;
 }
 .hero-badge {
   display: inline-block;
@@ -91,7 +85,7 @@ body {
 .hero-sub { font-size: 12px; color: var(--text3); margin-top: 12px; }
 
 /* ══ MAIN APP ══ */
-#appRoot { display: none; min-height: 100vh; }
+#appRoot { display: block; min-height: 100vh; }
 
 /* ══ HEADER ══ */
 .header {
@@ -335,7 +329,7 @@ body {
   <div class="hero-badge">Live Surveillance Network</div>
   <h1>AHS<br/><span>Alert</span> SA</h1>
   <p>African Horse Sickness case tracking across South Africa — real-time, nationwide.</p>
-  <<button class="hero-btn" onclick="document.getElementById('heroScreen').style.display='none';document.getElementById('appRoot').style.display='block';renderAll();">View live cases</button>>View live cases</button>
+  <button class="hero-btn" onclick="document.getElementById('heroScreen').style.display='none';document.getElementById('appRoot').style.display='block';renderAll();">View live cases</button>
   <div class="hero-sub">Public access · No login required to view</div>
 </div>
 
@@ -516,17 +510,7 @@ const ADMIN_EMAILS = [
 ];
 
 // ══ MAP DATA ══
-const PROV_COORDS = {
-  'Gauteng':       { x: 340, y: 210 },
-  'Western Cape':  { x: 170, y: 395 },
-  'Eastern Cape':  { x: 300, y: 380 },
-  'KwaZulu-Natal': { x: 385, y: 300 },
-  'Limpopo':       { x: 338, y: 138 },
-  'Mpumalanga':    { x: 378, y: 188 },
-  'North West':    { x: 272, y: 188 },
-  'Free State':    { x: 285, y: 282 },
-  'Northern Cape': { x: 195, y: 268 }
-};
+
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const SEASONS = [
