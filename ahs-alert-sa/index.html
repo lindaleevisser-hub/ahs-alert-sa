@@ -10,8 +10,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="AHS Alert SA" />
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23c0392b'/%3E%3Ctext x='90' y='118' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='68' fill='white'%3EAHS%3C/text%3E%3C/svg%3E" />
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&display=swap');
 
@@ -46,13 +44,7 @@ body {
 
 /* ══ HERO WELCOME ══ */
 #heroScreen {
-  position: fixed; inset: 0;
-  background: var(--bg-dark);
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  z-index: 300;
-  text-align: center;
-  padding: 2rem;
+  display: none !important;
 }
 .hero-badge {
   display: inline-block;
@@ -93,7 +85,7 @@ body {
 .hero-sub { font-size: 12px; color: var(--text3); margin-top: 12px; }
 
 /* ══ MAIN APP ══ */
-#appRoot { display: none; min-height: 100vh; }
+#appRoot { display: block; min-height: 100vh; }
 
 /* ══ HEADER ══ */
 .header {
@@ -188,16 +180,13 @@ body {
   padding: 1rem;
 }
 .card-title { font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
-.leaflet-container { background: #0d1a26 !important; font-family: 'DM Sans', sans-serif !important; }
-.leaflet-tile { filter: brightness(0.7) saturate(0.8); }
-.ahs-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.6); cursor: pointer; transition: transform 0.15s; }
-.ahs-dot:hover { transform: scale(1.3); }
-.ahs-pulse { width: 24px; height: 24px; border-radius: 50%; border: 2px solid; opacity: 0.4; animation: pulse 2s infinite; }
-@keyframes pulse { 0%,100%{transform:scale(1);opacity:0.4} 50%{transform:scale(1.4);opacity:0.1} }
-.leaflet-popup-content-wrapper { background: #181815; border: 0.5px solid rgba(255,255,255,0.14); border-radius: 10px; color: #f0ede6; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
-.leaflet-popup-tip { background: #181815; }
-.leaflet-popup-content { margin: 10px 12px; font-size: 12px; min-width: 180px; }
-.leaflet-popup-close-button { color: #a8a49c !important; }
+.map-wrap { position:relative; width:100%; aspect-ratio:1.1; border-radius:var(--radius-sm); overflow:hidden; }
+.dot { cursor:pointer; transition:r 0.15s, opacity 0.15s; }
+.dot:hover { opacity:0.75; }
+.town-label { font-size:8px; fill:#bbb; pointer-events:none; font-family:'DM Sans',sans-serif; font-weight:500; }
+.prov-label { font-size:7.5px; fill:#555; pointer-events:none; font-family:'DM Sans',sans-serif; }
+@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.1} }
+.pulse-ring { animation:pulse 2s infinite; }
 
 /* ══ TOOLTIP ══ */
 .tooltip {
@@ -340,7 +329,7 @@ body {
   <div class="hero-badge">Live Surveillance Network</div>
   <h1>AHS<br/><span>Alert</span> SA</h1>
   <p>African Horse Sickness case tracking across South Africa — real-time, nationwide.</p>
-  <button class="hero-btn" onclick="enterApp()">View live cases</button>
+  <button class="hero-btn" id="enterBtn">View live cases</button>
   <div class="hero-sub">Public access · No login required to view</div>
 </div>
 
@@ -390,8 +379,10 @@ body {
     <div class="main-grid">
       <div class="map-card">
         <div class="card-title">Case map — click a dot for details</div>
-        <div id="leafletMap" style="width:100%;height:500px;border-radius:8px;z-index:1"></div>
-        <div class="tooltip" id="tooltip"></div>
+        <div class="map-wrap" id="mapWrap">
+          <svg id="saMap" viewBox="0 0 560 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"></svg>
+          <div class="tooltip" id="tooltip"></div>
+        </div>
         <div class="legend">
           <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div>Active (high)</div>
           <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div>Ongoing / medium</div>
@@ -519,17 +510,7 @@ const ADMIN_EMAILS = [
 ];
 
 // ══ MAP DATA ══
-const PROV_COORDS = {
-  'Gauteng':       { x: 340, y: 210 },
-  'Western Cape':  { x: 170, y: 395 },
-  'Eastern Cape':  { x: 300, y: 380 },
-  'KwaZulu-Natal': { x: 385, y: 300 },
-  'Limpopo':       { x: 338, y: 138 },
-  'Mpumalanga':    { x: 378, y: 188 },
-  'North West':    { x: 272, y: 188 },
-  'Free State':    { x: 285, y: 282 },
-  'Northern Cape': { x: 195, y: 268 }
-};
+
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const SEASONS = [
@@ -547,13 +528,15 @@ let selectedMonth = null;
 let selectedProv = 'All provinces';
 
 // ══ HERO ══
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('enterBtn');
+  if (btn) btn.addEventListener('click', enterApp);
+});
+
 function enterApp() {
   document.getElementById('heroScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
-  setTimeout(async () => {
-    await initMap();
-    renderAll();
-  }, 150);
+  renderAll();
 }
 
 // ══ AUTH ══
@@ -683,187 +666,123 @@ function renderStats() {
   document.getElementById('statProv').textContent = new Set(fc.map(c => getProvince(c)).filter(Boolean)).size;
 }
 
-// ══ LEAFLET MAP ══
-let leafletMap = null;
-let markerLayer = null;
-
-// SA town coordinates lookup
-const TOWN_COORDS = {
-  'warmbaths': [-24.88, 28.28], 'bela-bela': [-24.88, 28.28],
-  'modimolle': [-24.69, 28.40], 'pretoria': [-25.74, 28.19],
-  'johannesburg': [-26.20, 28.04], 'sandton': [-26.10, 28.06],
-  'centurion': [-25.86, 28.19], 'midrand': [-25.99, 28.13],
-  'cape town': [-33.93, 18.42], 'stellenbosch': [-33.93, 18.86],
-  'paarl': [-33.73, 18.96], 'george': [-33.96, 22.46],
-  'durban': [-29.86, 31.02], 'durban north': [-29.79, 31.04],
-  'pietermaritzburg': [-29.62, 30.39], 'richards bay': [-28.78, 32.06],
-  'polokwane': [-23.90, 29.45], 'lephalale': [-23.67, 27.71],
-  'tzaneen': [-23.83, 30.16], 'phalaborwa': [-23.94, 31.14],
-  'nelspruit': [-25.47, 30.97], 'mbombela': [-25.47, 30.97],
-  'witbank': [-25.87, 29.23], 'emalahleni': [-25.87, 29.23],
-  'rustenburg': [-25.66, 27.24], 'klerksdorp': [-26.85, 26.66],
-  'mahikeng': [-25.86, 25.64], 'mafikeng': [-25.86, 25.64],
-  'bloemfontein': [-29.12, 26.21], 'welkom': [-27.98, 26.74],
-  'kimberley': [-28.73, 24.76], 'upington': [-28.45, 21.26],
-  'east london': [-33.02, 27.91], 'port elizabeth': [-33.96, 25.60],
-  'gqeberha': [-33.96, 25.60], 'grahamstown': [-33.30, 26.52],
-  'makhanda': [-33.30, 26.52], 'springbok': [-29.66, 17.89],
-  'vryburg': [-26.96, 24.73], 'kuruman': [-27.45, 23.43],
-  'ermelo': [-26.52, 29.99], 'standerton': [-26.94, 29.23],
-  'barberton': [-25.78, 31.05], 'hazyview': [-25.05, 31.13],
-  'white river': [-25.33, 31.00], 'volksrust': [-27.37, 29.88],
-  'secunda': [-26.52, 29.17], 'hendrina': [-26.17, 29.72],
-  'lichtenburg': [-26.15, 26.16], 'brits': [-25.63, 27.78],
-  'hartbeespoort': [-25.74, 27.90], 'lanseria': [-25.93, 27.93],
-  'bapsfontein': [-26.10, 28.41], 'bronkhorstspruit': [-25.80, 28.74],
-  'cullinan': [-25.67, 28.52], 'delmas': [-26.14, 28.68],
-  'springs': [-26.25, 28.44], 'benoni': [-26.19, 28.32],
-  'boksburg': [-26.21, 28.26], 'germiston': [-26.22, 28.17],
-  'krugersdorp': [-26.09, 27.77], 'randfontein': [-26.18, 27.70],
-  'vereeniging': [-26.67, 27.93], 'vanderbijlpark': [-26.70, 27.84],
-  'heidelberg': [-26.50, 28.36], 'nigel': [-26.42, 28.47],
-  'nylstroom': [-24.69, 28.40], 'mokopane': [-24.19, 29.01],
-  'groblersdal': [-25.17, 29.39], 'marble hall': [-24.97, 29.29],
-  'thabazimbi': [-24.59, 27.41], 'bochum': [-23.00, 29.42],
-  'louis trichardt': [-23.04, 29.90], 'musina': [-22.34, 30.04],
-  'thohoyandou': [-22.95, 30.48], 'makhado': [-23.04, 29.90],
-  'dullstroom': [-25.41, 30.11], 'lydenburg': [-25.10, 30.45],
-  'sabie': [-25.09, 30.78], 'graskop': [-24.93, 30.83],
-  'komatipoort': [-25.44, 31.95], 'malelane': [-25.47, 31.55],
-  'carolina': [-26.07, 30.11], 'amsterdam': [-26.65, 30.67],
-  'piet retief': [-27.00, 30.81], 'volksrust': [-27.37, 29.88],
-  'newcastle': [-27.76, 29.93], 'ladysmith': [-28.56, 29.78],
-  'estcourt': [-29.02, 29.87], 'weenen': [-28.85, 30.08],
-  'greytown': [-29.06, 30.59], 'stanger': [-29.34, 31.29],
-  'tongaat': [-29.57, 31.12], 'pinetown': [-29.82, 30.86],
-  'amanzimtoti': [-30.06, 30.88], 'scottburgh': [-30.28, 30.76],
-  'port shepstone': [-30.74, 30.46], 'kokstad': [-30.55, 29.43],
-  'ixopo': [-30.15, 30.07], 'richmond': [-29.87, 30.27],
-  'howick': [-29.48, 30.23], 'mooi river': [-29.22, 30.00],
-  'bergville': [-28.74, 29.36], 'harrismith': [-28.27, 29.12],
-  'bethlehem': [-28.23, 28.31], 'clarens': [-28.53, 28.43],
-  'ficksburg': [-28.87, 27.88], 'ladybrand': [-29.19, 27.46],
-  'wepener': [-29.73, 27.03], 'springfontein': [-30.25, 25.73],
-  'trompsburg': [-30.02, 25.77], 'colesberg': [-30.72, 25.10],
-  'hanover': [-31.07, 24.46], 'richmond': [-29.87, 24.09],
-  'victoria west': [-31.41, 23.13], 'loxton': [-31.46, 22.36],
-  'fraserburg': [-31.92, 21.51], 'williston': [-31.35, 20.92],
-  'calvinia': [-31.47, 19.78], 'loeriesfontein': [-30.94, 19.44],
-  'vanrhynsdorp': [-31.61, 18.74], 'vredendal': [-31.67, 18.50],
-  'clanwilliam': [-32.18, 18.90], 'citrusdal': [-32.59, 19.01],
-  'worcester': [-33.64, 19.45], 'robertson': [-33.81, 19.88],
-  'swellendam': [-34.02, 20.44], 'bredasdorp': [-34.53, 20.04],
-  'hermanus': [-34.42, 19.24], 'caledon': [-34.23, 19.43],
-  'knysna': [-34.04, 23.05], 'plettenberg bay': [-34.05, 23.37],
-  'mossel bay': [-34.18, 22.14], 'oudtshoorn': [-33.59, 22.20],
-  'de rust': [-33.49, 22.54], 'willowmore': [-33.29, 23.49],
-  'aberdeen': [-32.48, 24.05], 'graaff-reinet': [-32.25, 24.54],
-  'middelburg': [-31.50, 25.01], 'cradock': [-32.17, 25.61],
-  'somerset east': [-32.72, 25.59], 'bedford': [-32.68, 26.10],
-  'adelaide': [-32.70, 26.30], 'fort beaufort': [-32.78, 26.63],
-  'alice': [-32.80, 26.84], 'king william's town': [-32.89, 27.39],
-  'bisho': [-32.85, 27.43], 'komani': [-31.90, 26.89],
-  'queenstown': [-31.90, 26.89], 'aliwal north': [-30.69, 26.71],
-  'burgersdorp': [-31.00, 26.33], 'steynsburg': [-31.30, 25.82]
+// ══ MAP ══
+const PROV_COORDS = {
+  'Gauteng':       {x:342,y:212}, 'Western Cape':  {x:158,y:390},
+  'Eastern Cape':  {x:295,y:378}, 'KwaZulu-Natal': {x:382,y:298},
+  'Limpopo':       {x:330,y:138}, 'Mpumalanga':    {x:372,y:188},
+  'North West':    {x:268,y:190}, 'Free State':    {x:278,y:282},
+  'Northern Cape': {x:192,y:268}
 };
 
-async function geocodeTown(town, province) {
-  const key = town.toLowerCase().trim();
-  if (TOWN_COORDS[key]) return TOWN_COORDS[key];
-  // Try Nominatim free geocoding
-  try {
-    const q = encodeURIComponent(town + ', ' + province + ', South Africa');
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=za`);
-    const d = await r.json();
-    if (d && d[0]) return [parseFloat(d[0].lat), parseFloat(d[0].lon)];
-  } catch(e) {}
-  return null;
+function dotColor(c) {
+  const st = getStatus(c);
+  if (st === 'deceased') return '#888888';
+  if (st === 'recovered') return '#27ae60';
+  if (st === 'ongoing') return '#e67e22';
+  const sev = getSeverity(c);
+  if (sev === 'low') return '#27ae60';
+  if (sev === 'medium') return '#e67e22';
+  return '#c0392b';
 }
 
-async function initMap() {
-  if (leafletMap) return;
-  if (typeof L === 'undefined') {
-    console.warn('Leaflet not loaded yet, retrying...');
-    await new Promise(r => setTimeout(r, 500));
-    if (typeof L === 'undefined') return;
-  }
-  leafletMap = L.map('leafletMap', {
-    center: [-29, 25],
-    zoom: 6,
-    zoomControl: true,
-    attributionControl: false
-  });
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-  }).addTo(leafletMap);
-
-  L.control.attribution({ position: 'bottomright', prefix: '' })
-    .addAttribution('© OpenStreetMap contributors')
-    .addTo(leafletMap);
-
-  markerLayer = L.layerGroup().addTo(leafletMap);
-}
-
-async function renderMap() {
-  await initMap();
-  if (!markerLayer) return;
-  markerLayer.clearLayers();
-
+function renderMap() {
   const fc = getFilteredCases();
+  const svg = document.getElementById('saMap');
+  if (!svg) return;
 
-  // Group by town+province
+  const saPath = 'M268,28 L312,20 L368,33 L418,56 L453,88 L477,126 L492,168 L496,212 L486,256 L467,288 L447,314 L422,340 L392,364 L358,384 L326,398 L292,408 L260,404 L228,394 L198,378 L170,358 L146,334 L128,304 L116,272 L110,242 L114,212 L126,184 L120,154 L126,124 L146,98 L174,76 L208,56 L242,40 Z';
+  const namPath = 'M110,242 L114,212 L126,184 L120,154 L126,124 L146,98 L136,88 L116,78 L92,73 L66,76 L46,93 L34,118 L28,148 L30,178 L38,208 L52,233 L72,248 L92,253 Z';
+  const bwaPath = 'M268,28 L242,40 L208,56 L174,76 L146,98 L126,124 L120,154 L126,184 L114,212 L110,242 L92,253 L72,248 L72,218 L82,188 L98,163 L116,138 L138,116 L163,98 L193,80 L218,60 L246,42 Z';
+  const lesPath = 'M305,330 L321,318 L337,326 L333,344 L315,350 Z';
+  const eswPath = 'M410,238 L422,230 L431,242 L426,252 L412,248 Z';
+
+  const abbr = {'KwaZulu-Natal':'KZN','Western Cape':'W.Cape','Eastern Cape':'E.Cape','Northern Cape':'N.Cape','North West':'NW','Mpumalanga':'Mpu','Free State':'Free State','Limpopo':'Limpopo','Gauteng':'Gauteng'};
+
+  const provLabels = Object.entries(PROV_COORDS).map(([name,pos]) =>
+    `<text x="${pos.x}" y="${pos.y+2}" text-anchor="middle" class="prov-label">${abbr[name]||name}</text>`
+  ).join('');
+
   const grouped = {};
   fc.forEach(c => {
-    const key = (getTown(c) + '|' + getProvince(c)).toLowerCase();
-    if (!grouped[key]) grouped[key] = { cases: [], town: getTown(c), province: getProvince(c) };
-    grouped[key].cases.push(c);
+    const prov = getProvince(c);
+    if (!prov) return;
+    if (!grouped[prov]) grouped[prov] = [];
+    grouped[prov].push(c);
   });
 
-  for (const [key, group] of Object.entries(grouped)) {
-    const coords = await geocodeTown(group.town, group.province);
-    if (!coords) continue;
-
-    const cs = group.cases;
+  const jitter = {};
+  let dots = '';
+  Object.entries(grouped).forEach(([prov, cs]) => {
+    const pos = PROV_COORDS[prov];
+    if (!pos) return;
+    if (!jitter[prov]) jitter[prov] = {x:((prov.length*13)%16)-8, y:((prov.length*17)%16)-8};
+    const cx = pos.x + jitter[prov].x;
+    const cy = pos.y + jitter[prov].y - 20;
     const color = dotColor(cs[0]);
-    const count = cs.length;
-    const hasActive = cs.some(c => getStatus(c) === 'active');
+    const cstr = encodeURIComponent(JSON.stringify(cs));
 
-    // Custom marker
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="position:relative;width:${count>1?20:14}px;height:${count>1?20:14}px">
-        ${hasActive ? `<div style="position:absolute;inset:-5px;border-radius:50%;border:2px solid ${color};opacity:0.4;animation:pulse 2s infinite"></div>` : ''}
-        <div style="width:${count>1?20:14}px;height:${count>1?20:14}px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;font-family:DM Sans,sans-serif">${count>1?count:''}</div>
-      </div>`,
-      iconSize: [count>1?20:14, count>1?20:14],
-      iconAnchor: [count>1?10:7, count>1?10:7]
-    });
+    if (cs.some(c => getStatus(c) === 'active')) {
+      dots += `<circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke="${color}" stroke-width="1.5" class="pulse-ring" opacity="0.35"/>`;
+    }
+    dots += `<circle class="dot" cx="${cx}" cy="${cy}" r="7" fill="${color}" fill-opacity="0.9" stroke="#0f0f0d" stroke-width="1.5" data-cases="${cstr}" data-prov="${prov}" onclick="showDotInfo(this,event)"/>`;
+    if (cs.length > 1) {
+      dots += `<text x="${cx+10}" y="${cy-3}" font-size="9" fill="${color}" font-weight="700" font-family="DM Sans,sans-serif">${cs.length}</text>`;
+    }
+    const towns = [...new Set(cs.map(c => getTown(c)).filter(Boolean))].slice(0,2);
+    if (towns.length) {
+      dots += `<text x="${cx}" y="${cy+18}" text-anchor="middle" class="town-label">${towns.join(', ')}</text>`;
+    }
+  });
 
-    const popupRows = cs.map(c => {
-      const st = getStatus(c);
-      const sev = getSeverity(c);
-      return `<div style="border-top:0.5px solid rgba(255,255,255,0.1);padding:6px 0;margin-top:4px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:600;font-size:12px">${getTown(c)}</span>
-          <span style="background:rgba(192,57,43,0.3);color:#e88;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;text-transform:uppercase">${sev}</span>
-        </div>
-        <div style="font-size:11px;color:#a8a49c;margin-top:2px">${getProvince(c)} · ${c.date||''}</div>
-        <div style="font-size:11px;color:#a8a49c">${getType(c)} · <span style="color:${st==='deceased'?'#888':st==='recovered'?'#6fcf97':st==='ongoing'?'#f5a623':'#e88'}">${st}</span>${getCount(c)>1?' · '+getCount(c)+' horses':''}</div>
-        ${getOwner(c)?`<div style="font-size:11px;color:#a8a49c">Reporter: ${getOwner(c)}</div>`:''}
-        ${getVet(c)?`<div style="font-size:11px;color:#a8a49c">Vet: ${getVet(c)}</div>`:''}
-        ${getNotes(c)?`<div style="font-size:11px;color:#6a6660;font-style:italic;margin-top:2px">${getNotes(c)}</div>`:''}
-      </div>`;
-    }).join('');
-
-    const popup = L.popup({ maxWidth: 280, className: 'ahs-popup' })
-      .setContent(`<div style="font-weight:600;font-size:13px;margin-bottom:4px">${group.town}, ${group.province}</div>${popupRows}`);
-
-    L.marker(coords, { icon }).addTo(markerLayer).bindPopup(popup);
-  }
+  svg.innerHTML = `
+    <rect width="560" height="500" fill="#0d1a26" rx="8"/>
+    <path d="${namPath}" fill="#1a2a1a" stroke="#2a3a2a" stroke-width="0.8"/>
+    <path d="${bwaPath}" fill="#1a2218" stroke="#2a3228" stroke-width="0.8"/>
+    <path d="${saPath}" fill="#1e2d14" stroke="#4a7a28" stroke-width="1.2"/>
+    <path d="${lesPath}" fill="#2a2a1a" stroke="#5a5a38" stroke-width="0.7"/>
+    <path d="${eswPath}" fill="#2a2a1a" stroke="#5a5a38" stroke-width="0.7"/>
+    <text x="62" y="168" font-size="9" fill="#3a5a3a" font-family="DM Sans,sans-serif" transform="rotate(-10,62,168)">NAMIBIA</text>
+    <text x="148" y="152" font-size="9" fill="#3a5a3a" font-family="DM Sans,sans-serif">BOTSWANA</text>
+    ${provLabels}${dots}`;
 }
 
-function hideTT() {}
+function showDotInfo(el, e) {
+  e.stopPropagation();
+  const cs = JSON.parse(decodeURIComponent(el.getAttribute('data-cases')));
+  const prov = el.getAttribute('data-prov');
+  const tt = document.getElementById('tooltip');
+  const wrap = document.getElementById('mapWrap');
+  const wr = wrap.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+
+  const rows = cs.map(c => {
+    const st = getStatus(c); const sev = getSeverity(c);
+    return `<div style="border-top:0.5px solid rgba(255,255,255,0.08);padding:6px 0;margin-top:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:600;font-size:12px;color:#f0ede6">${getTown(c)||'Unknown'}</span>
+        <span style="background:rgba(192,57,43,0.3);color:#e88;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;text-transform:uppercase">${sev}</span>
+      </div>
+      <div style="font-size:11px;color:#a8a49c;margin-top:2px">${getProvince(c)} · ${c.date||''}</div>
+      <div style="font-size:11px;color:#a8a49c">${getType(c)} · <span style="color:${st==='deceased'?'#888':st==='recovered'?'#6fcf97':st==='ongoing'?'#f5a623':'#e88'}">${st}</span>${getCount(c)>1?' · '+getCount(c)+' horses':''}</div>
+      ${getOwner(c)?`<div style="font-size:11px;color:#a8a49c">Reporter: ${getOwner(c)}</div>`:''}
+      ${getVet(c)?`<div style="font-size:11px;color:#a8a49c">Vet: ${getVet(c)}</div>`:''}
+      ${getNotes(c)?`<div style="font-size:11px;color:#6a6660;font-style:italic;margin-top:2px">${getNotes(c)}</div>`:''}
+    </div>`;
+  }).join('');
+
+  tt.innerHTML = `<h3 style="font-size:13px;font-weight:600;margin-bottom:4px;color:#f0ede6">${prov} — ${cs.length} case${cs.length>1?'s':''}</h3>${rows}`;
+  tt.classList.add('show');
+  setTimeout(() => {
+    const tx = er.left - wr.left + 14;
+    const ty = er.top - wr.top - 14;
+    tt.style.left = Math.min(tx, wr.width - tt.offsetWidth - 8) + 'px';
+    tt.style.top = Math.max(4, ty - tt.offsetHeight) + 'px';
+  }, 0);
+  document.addEventListener('click', hideTT, {once:true});
+}
+
+function hideTT() { document.getElementById('tooltip').classList.remove('show'); }
 
 // ══ CASE LIST ══
 function renderCaseList() {
