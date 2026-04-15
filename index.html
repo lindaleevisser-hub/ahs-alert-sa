@@ -180,13 +180,19 @@ body {
   padding: 1rem;
 }
 .card-title { font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
-.map-wrap { position:relative; width:100%; aspect-ratio:1.1; border-radius:var(--radius-sm); overflow:hidden; }
+.map-wrap { position:relative; width:100%; aspect-ratio:1.1; border-radius:var(--radius-sm); overflow:hidden; cursor:grab; }
+.map-wrap:active { cursor:grabbing; }
 .dot { cursor:pointer; transition:r 0.15s, opacity 0.15s; }
 .dot:hover { opacity:0.75; }
-.town-label { font-size:8px; fill:#bbb; pointer-events:none; font-family:'DM Sans',sans-serif; font-weight:500; }
-.prov-label { font-size:7.5px; fill:#555; pointer-events:none; font-family:'DM Sans',sans-serif; }
-@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.1} }
+.town-label { font-size:8px; fill:#ccc; pointer-events:none; font-family:'DM Sans',sans-serif; font-weight:500; }
+.prov-label { font-size:9px; fill:#aaa; pointer-events:none; font-family:'DM Sans',sans-serif; font-weight:600; }
+.prov-shape { transition: fill 0.2s; cursor:pointer; }
+.prov-shape:hover { filter: brightness(1.3); }
+@keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:0.15} }
 .pulse-ring { animation:pulse 2s infinite; }
+.map-controls { position:absolute; bottom:10px; right:10px; display:flex; flex-direction:column; gap:4px; z-index:5; }
+.map-btn { width:28px; height:28px; background:var(--surface2); border:0.5px solid var(--border2); border-radius:6px; color:var(--text); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:monospace; transition:background 0.15s; }
+.map-btn:hover { background:var(--surface); }
 
 /* ══ TOOLTIP ══ */
 .tooltip {
@@ -378,10 +384,15 @@ body {
     <!-- Map + side panel -->
     <div class="main-grid">
       <div class="map-card">
-        <div class="card-title">Case map — click a dot for details</div>
+        <div class="card-title">Case map — click province or dot · scroll/pinch to zoom</div>
         <div class="map-wrap" id="mapWrap">
-          <svg id="saMap" viewBox="0 0 560 500" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"></svg>
+          <svg id="saMap" viewBox="0 0 800 700" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block"></svg>
           <div class="tooltip" id="tooltip"></div>
+          <div class="map-controls">
+            <button class="map-btn" onclick="mapZoom(1.3)" title="Zoom in">+</button>
+            <button class="map-btn" onclick="mapZoom(0.77)" title="Zoom out">−</button>
+            <button class="map-btn" onclick="mapReset()" title="Reset" style="font-size:11px">⌂</button>
+          </div>
         </div>
         <div class="legend">
           <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div>Active (high)</div>
@@ -666,14 +677,116 @@ function renderStats() {
   document.getElementById('statProv').textContent = new Set(fc.map(c => getProvince(c)).filter(Boolean)).size;
 }
 
-// ══ MAP ══
-const PROV_COORDS = {
-  'Gauteng':       {x:342,y:212}, 'Western Cape':  {x:158,y:390},
-  'Eastern Cape':  {x:295,y:378}, 'KwaZulu-Natal': {x:382,y:298},
-  'Limpopo':       {x:330,y:138}, 'Mpumalanga':    {x:372,y:188},
-  'North West':    {x:268,y:190}, 'Free State':    {x:278,y:282},
-  'Northern Cape': {x:192,y:268}
+// ══ MAP — Proper SA Province Shapes + Zoom/Pan ══
+
+// Province paths scaled to 800×700 viewBox — accurate SA geography
+const PROV_PATHS = {
+  'Limpopo':       'M330,30 L390,25 L450,40 L500,65 L520,100 L510,140 L490,165 L460,178 L430,182 L400,175 L370,168 L345,155 L325,138 L318,115 L320,85 L325,60 Z',
+  'Mpumalanga':    'M460,178 L500,165 L530,178 L545,205 L538,235 L520,255 L496,262 L470,255 L448,238 L440,215 L445,195 Z',
+  'Gauteng':       'M390,175 L430,182 L445,195 L440,215 L420,228 L398,230 L375,220 L368,205 L375,190 Z',
+  'North West':    'M270,120 L325,138 L345,155 L370,168 L375,190 L368,205 L345,218 L315,225 L285,218 L258,200 L245,175 L248,150 L260,132 Z',
+  'Free State':    'M258,200 L285,218 L315,225 L345,218 L368,205 L375,220 L398,230 L420,228 L440,215 L448,238 L445,268 L430,295 L408,315 L378,328 L348,335 L315,332 L285,322 L260,305 L242,282 L238,258 L245,232 Z',
+  'KwaZulu-Natal': 'M448,238 L470,255 L496,262 L520,255 L545,270 L558,300 L555,335 L538,362 L515,382 L488,395 L460,398 L435,388 L415,368 L405,342 L408,315 L430,295 L445,268 Z',
+  'Northern Cape': 'M80,145 L130,118 L180,105 L230,100 L270,120 L260,132 L248,150 L245,175 L238,205 L225,235 L208,262 L188,285 L165,302 L140,312 L112,310 L88,295 L68,272 L55,245 L52,215 L58,185 L68,162 Z',
+  'Western Cape':  'M88,295 L112,310 L140,312 L165,302 L188,285 L208,262 L225,235 L238,258 L242,282 L235,308 L220,332 L200,352 L175,368 L148,378 L120,382 L94,375 L72,358 L58,335 L52,308 L60,288 L75,282 Z',
+  'Eastern Cape':  'M242,282 L260,305 L285,322 L315,332 L348,335 L378,328 L408,315 L405,342 L415,368 L410,395 L395,418 L370,432 L340,440 L308,440 L278,432 L250,416 L226,395 L208,370 L198,342 L200,315 L210,295 L225,282 Z'
 };
+
+// Label positions for each province
+const PROV_LABEL_POS = {
+  'Limpopo':       {x:415, y:108},
+  'Mpumalanga':    {x:494, y:218},
+  'Gauteng':       {x:407, y:208},
+  'North West':    {x:300, y:175},
+  'Free State':    {x:345, y:275},
+  'KwaZulu-Natal': {x:498, y:320},
+  'Northern Cape': {x:165, y:218},
+  'Western Cape':  {x:145, y:342},
+  'Eastern Cape':  {x:305, y:390}
+};
+
+const PROV_ABBR = {
+  'KwaZulu-Natal':'KZN','Western Cape':'W Cape','Eastern Cape':'E Cape',
+  'Northern Cape':'N Cape','North West':'NW','Mpumalanga':'Mpum',
+  'Free State':'Free State','Limpopo':'Limpopo','Gauteng':'Gauteng'
+};
+
+// Dot anchor (centroid) for each province
+const PROV_COORDS = {
+  'Limpopo':       {x:415,y:118}, 'Mpumalanga':    {x:494,y:228},
+  'Gauteng':       {x:407,y:213}, 'North West':    {x:300,y:182},
+  'Free State':    {x:348,y:278}, 'KwaZulu-Natal': {x:498,y:328},
+  'Northern Cape': {x:165,y:225}, 'Western Cape':  {x:148,y:345},
+  'Eastern Cape':  {x:308,y:395}
+};
+
+// Zoom/pan state
+let mapScale = 1, mapTx = 0, mapTy = 0;
+let mapDragging = false, mapDragStart = null;
+
+function mapZoom(factor) {
+  mapScale = Math.min(6, Math.max(1, mapScale * factor));
+  applyMapTransform();
+}
+function mapReset() { mapScale=1; mapTx=0; mapTy=0; applyMapTransform(); }
+function applyMapTransform() {
+  const g = document.getElementById('mapG');
+  if (g) g.setAttribute('transform', `translate(${mapTx},${mapTy}) scale(${mapScale})`);
+}
+
+// Setup drag/zoom on mount
+function initMapInteraction() {
+  const svg = document.getElementById('saMap');
+  if (!svg || svg._mapInit) return;
+  svg._mapInit = true;
+
+  // Wheel zoom
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const rect = svg.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) / rect.width * 800;
+    const my = (e.clientY - rect.top) / rect.height * 700;
+    const factor = e.deltaY < 0 ? 1.2 : 0.83;
+    const newScale = Math.min(6, Math.max(1, mapScale * factor));
+    mapTx = mx - (mx - mapTx) * (newScale / mapScale);
+    mapTy = my - (my - mapTy) * (newScale / mapScale);
+    mapScale = newScale;
+    // clamp
+    mapTx = Math.min(0, Math.max(mapTx, 800 - 800*mapScale));
+    mapTy = Math.min(0, Math.max(mapTy, 700 - 700*mapScale));
+    applyMapTransform();
+  }, {passive:false});
+
+  // Drag
+  svg.addEventListener('mousedown', e => { mapDragging=true; mapDragStart={x:e.clientX-mapTx, y:e.clientY-mapTy}; });
+  window.addEventListener('mousemove', e => {
+    if (!mapDragging) return;
+    mapTx = Math.min(0, Math.max(e.clientX-mapDragStart.x, 800-800*mapScale));
+    mapTy = Math.min(0, Math.max(e.clientY-mapDragStart.y, 700-700*mapScale));
+    applyMapTransform();
+  });
+  window.addEventListener('mouseup', () => { mapDragging=false; });
+
+  // Touch
+  let lastTouchDist = null;
+  svg.addEventListener('touchstart', e => {
+    if (e.touches.length===1) mapDragStart={x:e.touches[0].clientX-mapTx, y:e.touches[0].clientY-mapTy};
+    if (e.touches.length===2) lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  },{passive:true});
+  svg.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length===1 && mapDragStart) {
+      mapTx=Math.min(0,Math.max(e.touches[0].clientX-mapDragStart.x,800-800*mapScale));
+      mapTy=Math.min(0,Math.max(e.touches[0].clientY-mapDragStart.y,700-700*mapScale));
+      applyMapTransform();
+    }
+    if (e.touches.length===2 && lastTouchDist) {
+      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      mapScale=Math.min(6,Math.max(1,mapScale*(d/lastTouchDist)));
+      lastTouchDist=d; applyMapTransform();
+    }
+  },{passive:false});
+}
 
 function dotColor(c) {
   const st = getStatus(c);
@@ -686,23 +799,27 @@ function dotColor(c) {
   return '#c0392b';
 }
 
+function provFillColor(cases) {
+  if (!cases || !cases.length) return '#1a2a1e';
+  const worst = cases.reduce((best, c) => {
+    const st = getStatus(c);
+    if (st==='active') return 'active';
+    if (st==='ongoing' && best!=='active') return 'ongoing';
+    if (st==='deceased' && best!=='active' && best!=='ongoing') return 'deceased';
+    return best==='active'||best==='ongoing'||best==='deceased'? best : 'recovered';
+  }, 'recovered');
+  if (worst==='active') return 'rgba(192,57,43,0.45)';
+  if (worst==='ongoing') return 'rgba(230,126,34,0.35)';
+  if (worst==='deceased') return 'rgba(100,100,100,0.35)';
+  return 'rgba(39,174,96,0.28)';
+}
+
 function renderMap() {
   const fc = getFilteredCases();
   const svg = document.getElementById('saMap');
   if (!svg) return;
 
-  const saPath = 'M268,28 L312,20 L368,33 L418,56 L453,88 L477,126 L492,168 L496,212 L486,256 L467,288 L447,314 L422,340 L392,364 L358,384 L326,398 L292,408 L260,404 L228,394 L198,378 L170,358 L146,334 L128,304 L116,272 L110,242 L114,212 L126,184 L120,154 L126,124 L146,98 L174,76 L208,56 L242,40 Z';
-  const namPath = 'M110,242 L114,212 L126,184 L120,154 L126,124 L146,98 L136,88 L116,78 L92,73 L66,76 L46,93 L34,118 L28,148 L30,178 L38,208 L52,233 L72,248 L92,253 Z';
-  const bwaPath = 'M268,28 L242,40 L208,56 L174,76 L146,98 L126,124 L120,154 L126,184 L114,212 L110,242 L92,253 L72,248 L72,218 L82,188 L98,163 L116,138 L138,116 L163,98 L193,80 L218,60 L246,42 Z';
-  const lesPath = 'M305,330 L321,318 L337,326 L333,344 L315,350 Z';
-  const eswPath = 'M410,238 L422,230 L431,242 L426,252 L412,248 Z';
-
-  const abbr = {'KwaZulu-Natal':'KZN','Western Cape':'W.Cape','Eastern Cape':'E.Cape','Northern Cape':'N.Cape','North West':'NW','Mpumalanga':'Mpu','Free State':'Free State','Limpopo':'Limpopo','Gauteng':'Gauteng'};
-
-  const provLabels = Object.entries(PROV_COORDS).map(([name,pos]) =>
-    `<text x="${pos.x}" y="${pos.y+2}" text-anchor="middle" class="prov-label">${abbr[name]||name}</text>`
-  ).join('');
-
+  // Group cases by province
   const grouped = {};
   fc.forEach(c => {
     const prov = getProvince(c);
@@ -711,40 +828,73 @@ function renderMap() {
     grouped[prov].push(c);
   });
 
-  const jitter = {};
+  // Build province shapes
+  let provShapes = '';
+  Object.entries(PROV_PATHS).forEach(([name, path]) => {
+    const cs = grouped[name] || [];
+    const fill = provFillColor(cs);
+    const hasCases = cs.length > 0;
+    const cstr = hasCases ? encodeURIComponent(JSON.stringify(cs)) : '';
+    const clickAttr = hasCases ? `data-cases="${cstr}" data-prov="${name}" onclick="showDotInfo(this,event)"` : '';
+    const stroke = hasCases ? '#c0392b' : '#2a4a2a';
+    const sw = hasCases ? '1.5' : '0.8';
+    provShapes += `<path class="prov-shape" d="${path}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${clickAttr}/>`;
+  });
+
+  // Province labels
+  let provLabels = '';
+  Object.entries(PROV_LABEL_POS).forEach(([name, pos]) => {
+    const abbr = PROV_ABBR[name] || name;
+    provLabels += `<text x="${pos.x}" y="${pos.y}" text-anchor="middle" class="prov-label" style="font-size:9px;fill:${grouped[name]?'#ddd':'#556'}">${abbr}</text>`;
+  });
+
+  // Case dots on top
   let dots = '';
   Object.entries(grouped).forEach(([prov, cs]) => {
     const pos = PROV_COORDS[prov];
     if (!pos) return;
-    if (!jitter[prov]) jitter[prov] = {x:((prov.length*13)%16)-8, y:((prov.length*17)%16)-8};
-    const cx = pos.x + jitter[prov].x;
-    const cy = pos.y + jitter[prov].y - 20;
     const color = dotColor(cs[0]);
     const cstr = encodeURIComponent(JSON.stringify(cs));
-
     if (cs.some(c => getStatus(c) === 'active')) {
-      dots += `<circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke="${color}" stroke-width="1.5" class="pulse-ring" opacity="0.35"/>`;
+      dots += `<circle cx="${pos.x}" cy="${pos.y}" r="14" fill="none" stroke="${color}" stroke-width="1.5" class="pulse-ring" opacity="0.4"/>`;
     }
-    dots += `<circle class="dot" cx="${cx}" cy="${cy}" r="7" fill="${color}" fill-opacity="0.9" stroke="#0f0f0d" stroke-width="1.5" data-cases="${cstr}" data-prov="${prov}" onclick="showDotInfo(this,event)"/>`;
+    dots += `<circle class="dot" cx="${pos.x}" cy="${pos.y}" r="8" fill="${color}" fill-opacity="0.95" stroke="#0f0f0d" stroke-width="1.5" data-cases="${cstr}" data-prov="${prov}" onclick="showDotInfo(this,event)"/>`;
     if (cs.length > 1) {
-      dots += `<text x="${cx+10}" y="${cy-3}" font-size="9" fill="${color}" font-weight="700" font-family="DM Sans,sans-serif">${cs.length}</text>`;
+      dots += `<text x="${pos.x}" y="${pos.y+4}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700" font-family="DM Sans,sans-serif" pointer-events="none">${cs.length}</text>`;
     }
     const towns = [...new Set(cs.map(c => getTown(c)).filter(Boolean))].slice(0,2);
     if (towns.length) {
-      dots += `<text x="${cx}" y="${cy+18}" text-anchor="middle" class="town-label">${towns.join(', ')}</text>`;
+      dots += `<text x="${pos.x}" y="${pos.y+22}" text-anchor="middle" class="town-label">${towns.join(', ')}</text>`;
     }
   });
 
   svg.innerHTML = `
-    <rect width="560" height="500" fill="#0d1a26" rx="8"/>
-    <path d="${namPath}" fill="#1a2a1a" stroke="#2a3a2a" stroke-width="0.8"/>
-    <path d="${bwaPath}" fill="#1a2218" stroke="#2a3228" stroke-width="0.8"/>
-    <path d="${saPath}" fill="#1e2d14" stroke="#4a7a28" stroke-width="1.2"/>
-    <path d="${lesPath}" fill="#2a2a1a" stroke="#5a5a38" stroke-width="0.7"/>
-    <path d="${eswPath}" fill="#2a2a1a" stroke="#5a5a38" stroke-width="0.7"/>
-    <text x="62" y="168" font-size="9" fill="#3a5a3a" font-family="DM Sans,sans-serif" transform="rotate(-10,62,168)">NAMIBIA</text>
-    <text x="148" y="152" font-size="9" fill="#3a5a3a" font-family="DM Sans,sans-serif">BOTSWANA</text>
-    ${provLabels}${dots}`;
+    <defs>
+      <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+        <stop offset="0%" stop-color="#0d2030"/>
+        <stop offset="100%" stop-color="#060e14"/>
+      </radialGradient>
+    </defs>
+    <rect width="800" height="700" fill="url(#bgGrad)" rx="8"/>
+    <!-- Neighbouring countries -->
+    <path d="M80,145 L130,118 L180,105 L230,100 L270,120 L260,132 L230,125 L195,120 L160,128 L125,145 L95,165 L72,188 L55,215 L52,245 L58,272 L68,295 L52,308 L42,285 L30,258 L22,228 L24,195 L34,165 L52,142 L68,128 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
+    <text x="52" y="195" font-size="9" fill="#2a4a2a" font-family="DM Sans,sans-serif" transform="rotate(-15,52,195)">NAMIBIA</text>
+    <path d="M270,120 L325,138 L318,115 L305,88 L285,68 L260,52 L235,42 L208,38 L182,44 L162,58 L148,78 L145,102 L160,118 L190,112 L225,105 L260,110 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
+    <text x="210" y="72" font-size="9" fill="#2a4a2a" font-family="DM Sans,sans-serif">BOTSWANA</text>
+    <path d="M500,65 L540,52 L572,60 L588,82 L580,108 L558,125 L530,128 L510,115 L505,90 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
+    <text x="540" y="95" font-size="8" fill="#2a4a2a" font-family="DM Sans,sans-serif">ZIM</text>
+    <path d="M545,205 L575,188 L598,192 L608,215 L598,238 L575,248 L558,242 L548,225 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
+    <text x="575" y="222" font-size="8" fill="#2a4a2a" font-family="DM Sans,sans-serif">MOZ</text>
+    <!-- Lesotho & eSwatini -->
+    <path d="M348,335 L362,322 L378,328 L380,348 L365,358 L348,352 Z" fill="#151f15" stroke="#2a4a2a" stroke-width="0.7"/>
+    <text x="363" y="342" font-size="7" fill="#2a4a2a" text-anchor="middle" font-family="DM Sans,sans-serif">LES</text>
+    <path d="M520,255 L532,248 L540,258 L535,270 L522,268 Z" fill="#151f15" stroke="#2a4a2a" stroke-width="0.7"/>
+    <text x="530" y="262" font-size="6.5" fill="#2a4a2a" text-anchor="middle" font-family="DM Sans,sans-serif">eSW</text>
+    <!-- Province shapes -->
+    <g id="mapG">${provShapes}${provLabels}${dots}</g>`;
+
+  initMapInteraction();
+  applyMapTransform();
 }
 
 function showDotInfo(el, e) {
