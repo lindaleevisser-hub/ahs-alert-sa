@@ -9,9 +9,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="AHS Alert SA" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23c0392b'/%3E%3Ctext x='90' y='118' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='68' fill='white'%3EAHS%3C/text%3E%3C/svg%3E" />
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&display=swap');
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Serif+Display&display=swap" rel="stylesheet">
 
 :root {
   --red: #c0392b; --red-dark: #96281b; --red-light: #fde8e8;
@@ -180,41 +180,22 @@ body {
   padding: 1rem;
 }
 .card-title { font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
-.map-wrap { position:relative; width:100%; aspect-ratio:1.1; border-radius:var(--radius-sm); overflow:hidden; cursor:grab; }
-.map-wrap:active { cursor:grabbing; }
-.dot { cursor:pointer; transition:r 0.15s, opacity 0.15s; }
-.dot:hover { opacity:0.75; }
-.town-label { font-size:8px; fill:#ccc; pointer-events:none; font-family:'DM Sans',sans-serif; font-weight:500; }
-.prov-label { font-size:9px; fill:#aaa; pointer-events:none; font-family:'DM Sans',sans-serif; font-weight:600; }
-.prov-shape { transition: fill 0.2s; cursor:pointer; }
-.prov-shape:hover { filter: brightness(1.3); }
-@keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:0.15} }
-.pulse-ring { animation:pulse 2s infinite; }
-.map-controls { position:absolute; bottom:10px; right:10px; display:flex; flex-direction:column; gap:4px; z-index:5; }
-.map-btn { width:28px; height:28px; background:var(--surface2); border:0.5px solid var(--border2); border-radius:6px; color:var(--text); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:monospace; transition:background 0.15s; }
-.map-btn:hover { background:var(--surface); }
+.map-wrap { position:relative; width:100%; height:420px; border-radius:var(--radius-sm); overflow:hidden; }
+#leafletMap { width:100%; height:100%; border-radius:var(--radius-sm); }
+.leaflet-popup-content-wrapper { background:var(--bg-dark2)!important; border:0.5px solid var(--border2)!important; border-radius:12px!important; box-shadow:0 6px 30px rgba(0,0,0,0.6)!important; color:var(--text)!important; }
+.leaflet-popup-tip { background:var(--bg-dark2)!important; }
+.leaflet-popup-content { margin:12px 14px!important; font-family:'DM Sans',sans-serif!important; font-size:12px!important; min-width:200px; }
+.leaflet-container { background:#0d1a26!important; font-family:'DM Sans',sans-serif!important; }
+.leaflet-control-zoom a { background:var(--surface2)!important; color:var(--text)!important; border-color:var(--border2)!important; }
+.leaflet-control-zoom a:hover { background:var(--surface)!important; }
+.pp-title { font-size:13px; font-weight:700; color:#f0ede6; margin-bottom:8px; }
+.pp-row { border-top:0.5px solid rgba(255,255,255,0.08); padding:6px 0; }
+.pp-loc { font-weight:600; font-size:12px; color:#f0ede6; }
+.pp-detail { font-size:11px; color:#a8a49c; margin-top:2px; }
+.pp-notes { font-size:11px; color:#6a6660; margin-top:2px; font-style:italic; }
+.geocode-status { font-size:10px; color:var(--text3); margin-top:6px; min-height:14px; }
 
-/* ══ TOOLTIP ══ */
-.tooltip {
-  position: absolute;
-  background: var(--bg-dark2);
-  border: 0.5px solid var(--border2);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 12px;
-  pointer-events: none;
-  display: none; z-index: 10;
-  min-width: 210px; max-width: 270px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-}
-.tooltip.show { display: block; }
-.tooltip h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
-.tt-case { border-top: 0.5px solid var(--border); padding: 7px 0; }
-.tt-case:first-of-type { border-top: none; padding-top: 0; }
-.tt-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
-.tt-name { font-weight: 600; font-size: 12px; color: var(--text); }
-.tt-detail { font-size: 11px; color: var(--text2); margin-top: 2px; }
-.tt-notes { font-size: 11px; color: var(--text3); margin-top: 3px; font-style: italic; }
+/* tooltip handled by Leaflet popups */
 
 /* ══ LEGEND ══ */
 .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
@@ -384,16 +365,11 @@ body {
     <!-- Map + side panel -->
     <div class="main-grid">
       <div class="map-card">
-        <div class="card-title">Case map — click province or dot · scroll/pinch to zoom</div>
+        <div class="card-title">Case map — exact town locations · click pin for details</div>
         <div class="map-wrap" id="mapWrap">
-          <svg id="saMap" viewBox="0 0 800 700" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block"></svg>
-          <div class="tooltip" id="tooltip"></div>
-          <div class="map-controls">
-            <button class="map-btn" onclick="mapZoom(1.3)" title="Zoom in">+</button>
-            <button class="map-btn" onclick="mapZoom(0.77)" title="Zoom out">−</button>
-            <button class="map-btn" onclick="mapReset()" title="Reset" style="font-size:11px">⌂</button>
-          </div>
+          <div id="leafletMap"></div>
         </div>
+        <div class="geocode-status" id="geocodeStatus"></div>
         <div class="legend">
           <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div>Active (high)</div>
           <div class="legend-item"><div class="legend-dot" style="background:#e67e22"></div>Ongoing / medium</div>
@@ -488,6 +464,8 @@ body {
   </div>
 </div>
 
+<!-- Leaflet -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -636,14 +614,6 @@ function getFilteredCases() {
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 }
 
-// ══ RENDER ALL ══
-function renderAll() {
-  renderSeasonBar();
-  renderProvBar();
-  renderStats();
-  renderMap();
-  renderCaseList();
-}
 
 function renderSeasonBar() {
   const bar = document.getElementById('seasonBar');
@@ -677,115 +647,45 @@ function renderStats() {
   document.getElementById('statProv').textContent = new Set(fc.map(c => getProvince(c)).filter(Boolean)).size;
 }
 
-// ══ MAP — Proper SA Province Shapes + Zoom/Pan ══
+// ══ LEAFLET MAP — Exact town locations with geocoding ══
+let leafletMap = null;
+let mapMarkers = [];
+const geocodeCache = {}; // town -> {lat, lng} stored in Firebase too
 
-// Province paths scaled to 800×700 viewBox — accurate SA geography
-const PROV_PATHS = {
-  'Limpopo':       'M330,30 L390,25 L450,40 L500,65 L520,100 L510,140 L490,165 L460,178 L430,182 L400,175 L370,168 L345,155 L325,138 L318,115 L320,85 L325,60 Z',
-  'Mpumalanga':    'M460,178 L500,165 L530,178 L545,205 L538,235 L520,255 L496,262 L470,255 L448,238 L440,215 L445,195 Z',
-  'Gauteng':       'M390,175 L430,182 L445,195 L440,215 L420,228 L398,230 L375,220 L368,205 L375,190 Z',
-  'North West':    'M270,120 L325,138 L345,155 L370,168 L375,190 L368,205 L345,218 L315,225 L285,218 L258,200 L245,175 L248,150 L260,132 Z',
-  'Free State':    'M258,200 L285,218 L315,225 L345,218 L368,205 L375,220 L398,230 L420,228 L440,215 L448,238 L445,268 L430,295 L408,315 L378,328 L348,335 L315,332 L285,322 L260,305 L242,282 L238,258 L245,232 Z',
-  'KwaZulu-Natal': 'M448,238 L470,255 L496,262 L520,255 L545,270 L558,300 L555,335 L538,362 L515,382 L488,395 L460,398 L435,388 L415,368 L405,342 L408,315 L430,295 L445,268 Z',
-  'Northern Cape': 'M80,145 L130,118 L180,105 L230,100 L270,120 L260,132 L248,150 L245,175 L238,205 L225,235 L208,262 L188,285 L165,302 L140,312 L112,310 L88,295 L68,272 L55,245 L52,215 L58,185 L68,162 Z',
-  'Western Cape':  'M88,295 L112,310 L140,312 L165,302 L188,285 L208,262 L225,235 L238,258 L242,282 L235,308 L220,332 L200,352 L175,368 L148,378 L120,382 L94,375 L72,358 L58,335 L52,308 L60,288 L75,282 Z',
-  'Eastern Cape':  'M242,282 L260,305 L285,322 L315,332 L348,335 L378,328 L408,315 L405,342 L415,368 L410,395 L395,418 L370,432 L340,440 L308,440 L278,432 L250,416 L226,395 L208,370 L198,342 L200,315 L210,295 L225,282 Z'
-};
-
-// Label positions for each province
-const PROV_LABEL_POS = {
-  'Limpopo':       {x:415, y:108},
-  'Mpumalanga':    {x:494, y:218},
-  'Gauteng':       {x:407, y:208},
-  'North West':    {x:300, y:175},
-  'Free State':    {x:345, y:275},
-  'KwaZulu-Natal': {x:498, y:320},
-  'Northern Cape': {x:165, y:218},
-  'Western Cape':  {x:145, y:342},
-  'Eastern Cape':  {x:305, y:390}
-};
-
-const PROV_ABBR = {
-  'KwaZulu-Natal':'KZN','Western Cape':'W Cape','Eastern Cape':'E Cape',
-  'Northern Cape':'N Cape','North West':'NW','Mpumalanga':'Mpum',
-  'Free State':'Free State','Limpopo':'Limpopo','Gauteng':'Gauteng'
-};
-
-// Dot anchor (centroid) for each province
-const PROV_COORDS = {
-  'Limpopo':       {x:415,y:118}, 'Mpumalanga':    {x:494,y:228},
-  'Gauteng':       {x:407,y:213}, 'North West':    {x:300,y:182},
-  'Free State':    {x:348,y:278}, 'KwaZulu-Natal': {x:498,y:328},
-  'Northern Cape': {x:165,y:225}, 'Western Cape':  {x:148,y:345},
-  'Eastern Cape':  {x:308,y:395}
-};
-
-// Zoom/pan state
-let mapScale = 1, mapTx = 0, mapTy = 0;
-let mapDragging = false, mapDragStart = null;
-
-function mapZoom(factor) {
-  mapScale = Math.min(6, Math.max(1, mapScale * factor));
-  applyMapTransform();
-}
-function mapReset() { mapScale=1; mapTx=0; mapTy=0; applyMapTransform(); }
-function applyMapTransform() {
-  const g = document.getElementById('mapG');
-  if (g) g.setAttribute('transform', `translate(${mapTx},${mapTy}) scale(${mapScale})`);
-}
-
-// Setup drag/zoom on mount
-function initMapInteraction() {
-  const svg = document.getElementById('saMap');
-  if (!svg || svg._mapInit) return;
-  svg._mapInit = true;
-
-  // Wheel zoom
-  svg.addEventListener('wheel', e => {
-    e.preventDefault();
-    const rect = svg.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) / rect.width * 800;
-    const my = (e.clientY - rect.top) / rect.height * 700;
-    const factor = e.deltaY < 0 ? 1.2 : 0.83;
-    const newScale = Math.min(6, Math.max(1, mapScale * factor));
-    mapTx = mx - (mx - mapTx) * (newScale / mapScale);
-    mapTy = my - (my - mapTy) * (newScale / mapScale);
-    mapScale = newScale;
-    // clamp
-    mapTx = Math.min(0, Math.max(mapTx, 800 - 800*mapScale));
-    mapTy = Math.min(0, Math.max(mapTy, 700 - 700*mapScale));
-    applyMapTransform();
-  }, {passive:false});
-
-  // Drag
-  svg.addEventListener('mousedown', e => { mapDragging=true; mapDragStart={x:e.clientX-mapTx, y:e.clientY-mapTy}; });
-  window.addEventListener('mousemove', e => {
-    if (!mapDragging) return;
-    mapTx = Math.min(0, Math.max(e.clientX-mapDragStart.x, 800-800*mapScale));
-    mapTy = Math.min(0, Math.max(e.clientY-mapDragStart.y, 700-700*mapScale));
-    applyMapTransform();
+// Initialise Leaflet map once
+function initLeafletMap() {
+  if (leafletMap) return;
+  leafletMap = L.map('leafletMap', {
+    center: [-29.0, 25.0],
+    zoom: 5,
+    zoomControl: true,
+    attributionControl: false
   });
-  window.addEventListener('mouseup', () => { mapDragging=false; });
 
-  // Touch
-  let lastTouchDist = null;
-  svg.addEventListener('touchstart', e => {
-    if (e.touches.length===1) mapDragStart={x:e.touches[0].clientX-mapTx, y:e.touches[0].clientY-mapTy};
-    if (e.touches.length===2) lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-  },{passive:true});
-  svg.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if (e.touches.length===1 && mapDragStart) {
-      mapTx=Math.min(0,Math.max(e.touches[0].clientX-mapDragStart.x,800-800*mapScale));
-      mapTy=Math.min(0,Math.max(e.touches[0].clientY-mapDragStart.y,700-700*mapScale));
-      applyMapTransform();
-    }
-    if (e.touches.length===2 && lastTouchDist) {
-      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-      mapScale=Math.min(6,Math.max(1,mapScale*(d/lastTouchDist)));
-      lastTouchDist=d; applyMapTransform();
-    }
-  },{passive:false});
+  // Dark tile layer from CartoDB
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 18,
+    subdomains: 'abcd'
+  }).addTo(leafletMap);
+
+  // Subtle attribution
+  L.control.attribution({prefix: false}).addTo(leafletMap);
+}
+
+// Marker icon by status/severity
+function makeIcon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
+    <ellipse cx="14" cy="33" rx="5" ry="2.5" fill="rgba(0,0,0,0.35)"/>
+    <path d="M14 2 C7.4 2 2 7.4 2 14 C2 22 14 34 14 34 C14 34 26 22 26 14 C26 7.4 20.6 2 14 2Z" fill="${color}" stroke="rgba(0,0,0,0.4)" stroke-width="1.5"/>
+    <circle cx="14" cy="14" r="5.5" fill="rgba(255,255,255,0.25)"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [28, 36],
+    iconAnchor: [14, 34],
+    popupAnchor: [0, -32]
+  });
 }
 
 function dotColor(c) {
@@ -799,142 +699,136 @@ function dotColor(c) {
   return '#c0392b';
 }
 
-function provFillColor(cases) {
-  if (!cases || !cases.length) return '#1a2a1e';
-  const worst = cases.reduce((best, c) => {
-    const st = getStatus(c);
-    if (st==='active') return 'active';
-    if (st==='ongoing' && best!=='active') return 'ongoing';
-    if (st==='deceased' && best!=='active' && best!=='ongoing') return 'deceased';
-    return best==='active'||best==='ongoing'||best==='deceased'? best : 'recovered';
-  }, 'recovered');
-  if (worst==='active') return 'rgba(192,57,43,0.45)';
-  if (worst==='ongoing') return 'rgba(230,126,34,0.35)';
-  if (worst==='deceased') return 'rgba(100,100,100,0.35)';
-  return 'rgba(39,174,96,0.28)';
+// Geocode a town name using OpenStreetMap Nominatim — free, no key needed
+async function geocodeTown(town, province, country) {
+  const key = `${town}__${province}`.toLowerCase().replace(/\s+/g,'_');
+
+  // 1. Check in-memory cache
+  if (geocodeCache[key]) return geocodeCache[key];
+
+  // 2. Check Firebase cache
+  const snap = await db.ref('geocache/' + key).once('value');
+  if (snap.val()) {
+    geocodeCache[key] = snap.val();
+    return snap.val();
+  }
+
+  // 3. Call Nominatim
+  try {
+    const query = encodeURIComponent(`${town}, ${province}, ${country || 'South Africa'}`);
+    const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=za,na,bw`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await res.json();
+    if (data && data[0]) {
+      const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      geocodeCache[key] = coords;
+      // Save to Firebase so we never look it up again
+      db.ref('geocache/' + key).set(coords);
+      return coords;
+    }
+  } catch(e) { /* network error — skip */ }
+  return null;
 }
 
-function renderMap() {
+// Fallback province centroids if geocoding fails
+const PROV_CENTROIDS = {
+  'Limpopo':       {lat:-23.8, lng:29.4}, 'Mpumalanga':    {lat:-25.5, lng:30.8},
+  'Gauteng':       {lat:-26.3, lng:28.0}, 'North West':    {lat:-26.6, lng:25.5},
+  'Free State':    {lat:-28.5, lng:26.2}, 'KwaZulu-Natal': {lat:-28.5, lng:30.5},
+  'Northern Cape': {lat:-29.0, lng:21.9}, 'Western Cape':  {lat:-33.2, lng:19.4},
+  'Eastern Cape':  {lat:-32.3, lng:26.4}
+};
+
+async function renderMap() {
+  initLeafletMap();
   const fc = getFilteredCases();
-  const svg = document.getElementById('saMap');
-  if (!svg) return;
 
-  // Group cases by province
-  const grouped = {};
+  // Clear existing markers
+  mapMarkers.forEach(m => leafletMap.removeLayer(m));
+  mapMarkers = [];
+
+  if (!fc.length) return;
+
+  const status = document.getElementById('geocodeStatus');
+  const pending = fc.filter(c => {
+    const key = `${getTown(c)}__${getProvince(c)}`.toLowerCase().replace(/\s+/g,'_');
+    return !geocodeCache[key];
+  });
+  if (pending.length) status.textContent = `📍 Locating ${pending.length} town${pending.length>1?'s':''}…`;
+
+  // Group by town for stacking multiple cases at same location
+  const byTown = {};
   fc.forEach(c => {
-    const prov = getProvince(c);
-    if (!prov) return;
-    if (!grouped[prov]) grouped[prov] = [];
-    grouped[prov].push(c);
+    const key = `${getTown(c)}||${getProvince(c)}`;
+    if (!byTown[key]) byTown[key] = [];
+    byTown[key].push(c);
   });
 
-  // Build province shapes
-  let provShapes = '';
-  Object.entries(PROV_PATHS).forEach(([name, path]) => {
-    const cs = grouped[name] || [];
-    const fill = provFillColor(cs);
-    const hasCases = cs.length > 0;
-    const cstr = hasCases ? encodeURIComponent(JSON.stringify(cs)) : '';
-    const clickAttr = hasCases ? `data-cases="${cstr}" data-prov="${name}" onclick="showDotInfo(this,event)"` : '';
-    const stroke = hasCases ? '#c0392b' : '#2a4a2a';
-    const sw = hasCases ? '1.5' : '0.8';
-    provShapes += `<path class="prov-shape" d="${path}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${clickAttr}/>`;
-  });
+  let located = 0;
+  for (const [key, cases] of Object.entries(byTown)) {
+    const [town, prov] = key.split('||');
+    if (!town) continue;
 
-  // Province labels
-  let provLabels = '';
-  Object.entries(PROV_LABEL_POS).forEach(([name, pos]) => {
-    const abbr = PROV_ABBR[name] || name;
-    provLabels += `<text x="${pos.x}" y="${pos.y}" text-anchor="middle" class="prov-label" style="font-size:9px;fill:${grouped[name]?'#ddd':'#556'}">${abbr}</text>`;
-  });
+    // Get coordinates
+    let coords = await geocodeTown(town, prov, 'South Africa');
+    if (!coords) coords = PROV_CENTROIDS[prov];
+    if (!coords) continue;
 
-  // Case dots on top
-  let dots = '';
-  Object.entries(grouped).forEach(([prov, cs]) => {
-    const pos = PROV_COORDS[prov];
-    if (!pos) return;
-    const color = dotColor(cs[0]);
-    const cstr = encodeURIComponent(JSON.stringify(cs));
-    if (cs.some(c => getStatus(c) === 'active')) {
-      dots += `<circle cx="${pos.x}" cy="${pos.y}" r="14" fill="none" stroke="${color}" stroke-width="1.5" class="pulse-ring" opacity="0.4"/>`;
-    }
-    dots += `<circle class="dot" cx="${pos.x}" cy="${pos.y}" r="8" fill="${color}" fill-opacity="0.95" stroke="#0f0f0d" stroke-width="1.5" data-cases="${cstr}" data-prov="${prov}" onclick="showDotInfo(this,event)"/>`;
-    if (cs.length > 1) {
-      dots += `<text x="${pos.x}" y="${pos.y+4}" text-anchor="middle" font-size="9" fill="#fff" font-weight="700" font-family="DM Sans,sans-serif" pointer-events="none">${cs.length}</text>`;
-    }
-    const towns = [...new Set(cs.map(c => getTown(c)).filter(Boolean))].slice(0,2);
-    if (towns.length) {
-      dots += `<text x="${pos.x}" y="${pos.y+22}" text-anchor="middle" class="town-label">${towns.join(', ')}</text>`;
-    }
-  });
+    located++;
+    const color = dotColor(cases[0]);
+    const icon = makeIcon(color);
 
-  svg.innerHTML = `
-    <defs>
-      <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
-        <stop offset="0%" stop-color="#0d2030"/>
-        <stop offset="100%" stop-color="#060e14"/>
-      </radialGradient>
-    </defs>
-    <rect width="800" height="700" fill="url(#bgGrad)" rx="8"/>
-    <!-- Neighbouring countries -->
-    <path d="M80,145 L130,118 L180,105 L230,100 L270,120 L260,132 L230,125 L195,120 L160,128 L125,145 L95,165 L72,188 L55,215 L52,245 L58,272 L68,295 L52,308 L42,285 L30,258 L22,228 L24,195 L34,165 L52,142 L68,128 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
-    <text x="52" y="195" font-size="9" fill="#2a4a2a" font-family="DM Sans,sans-serif" transform="rotate(-15,52,195)">NAMIBIA</text>
-    <path d="M270,120 L325,138 L318,115 L305,88 L285,68 L260,52 L235,42 L208,38 L182,44 L162,58 L148,78 L145,102 L160,118 L190,112 L225,105 L260,110 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
-    <text x="210" y="72" font-size="9" fill="#2a4a2a" font-family="DM Sans,sans-serif">BOTSWANA</text>
-    <path d="M500,65 L540,52 L572,60 L588,82 L580,108 L558,125 L530,128 L510,115 L505,90 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
-    <text x="540" y="95" font-size="8" fill="#2a4a2a" font-family="DM Sans,sans-serif">ZIM</text>
-    <path d="M545,205 L575,188 L598,192 L608,215 L598,238 L575,248 L558,242 L548,225 Z" fill="#111f10" stroke="#1e331e" stroke-width="0.8"/>
-    <text x="575" y="222" font-size="8" fill="#2a4a2a" font-family="DM Sans,sans-serif">MOZ</text>
-    <!-- Lesotho & eSwatini -->
-    <path d="M348,335 L362,322 L378,328 L380,348 L365,358 L348,352 Z" fill="#151f15" stroke="#2a4a2a" stroke-width="0.7"/>
-    <text x="363" y="342" font-size="7" fill="#2a4a2a" text-anchor="middle" font-family="DM Sans,sans-serif">LES</text>
-    <path d="M520,255 L532,248 L540,258 L535,270 L522,268 Z" fill="#151f15" stroke="#2a4a2a" stroke-width="0.7"/>
-    <text x="530" y="262" font-size="6.5" fill="#2a4a2a" text-anchor="middle" font-family="DM Sans,sans-serif">eSW</text>
-    <!-- Province shapes -->
-    <g id="mapG">${provShapes}${provLabels}${dots}</g>`;
+    // Build popup content
+    const rows = cases.map(c => {
+      const st = getStatus(c); const sev = getSeverity(c);
+      const stColor = st==='deceased'?'#888':st==='recovered'?'#6fcf97':st==='ongoing'?'#f5a623':'#e88';
+      return `<div class="pp-row">
+        <div class="pp-loc">${getTown(c)||'Unknown'}</div>
+        <div class="pp-detail">${getProvince(c)} · ${c.date||''}</div>
+        <div class="pp-detail">${getType(c)} · <span style="color:${stColor};font-weight:600">${st}</span> · <span style="color:#e88;font-weight:600;text-transform:uppercase;font-size:10px">${sev}</span>${getCount(c)>1?' · '+getCount(c)+' horses':''}</div>
+        ${getOwner(c)?`<div class="pp-detail">Reporter: ${getOwner(c)}</div>`:''}
+        ${getVet(c)?`<div class="pp-detail">Vet: ${getVet(c)}</div>`:''}
+        ${getNotes(c)?`<div class="pp-notes">${getNotes(c)}</div>`:''}
+      </div>`;
+    }).join('');
 
-  initMapInteraction();
-  applyMapTransform();
-}
-
-function showDotInfo(el, e) {
-  e.stopPropagation();
-  const cs = JSON.parse(decodeURIComponent(el.getAttribute('data-cases')));
-  const prov = el.getAttribute('data-prov');
-  const tt = document.getElementById('tooltip');
-  const wrap = document.getElementById('mapWrap');
-  const wr = wrap.getBoundingClientRect();
-  const er = el.getBoundingClientRect();
-
-  const rows = cs.map(c => {
-    const st = getStatus(c); const sev = getSeverity(c);
-    return `<div style="border-top:0.5px solid rgba(255,255,255,0.08);padding:6px 0;margin-top:4px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:600;font-size:12px;color:#f0ede6">${getTown(c)||'Unknown'}</span>
-        <span style="background:rgba(192,57,43,0.3);color:#e88;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:600;text-transform:uppercase">${sev}</span>
-      </div>
-      <div style="font-size:11px;color:#a8a49c;margin-top:2px">${getProvince(c)} · ${c.date||''}</div>
-      <div style="font-size:11px;color:#a8a49c">${getType(c)} · <span style="color:${st==='deceased'?'#888':st==='recovered'?'#6fcf97':st==='ongoing'?'#f5a623':'#e88'}">${st}</span>${getCount(c)>1?' · '+getCount(c)+' horses':''}</div>
-      ${getOwner(c)?`<div style="font-size:11px;color:#a8a49c">Reporter: ${getOwner(c)}</div>`:''}
-      ${getVet(c)?`<div style="font-size:11px;color:#a8a49c">Vet: ${getVet(c)}</div>`:''}
-      ${getNotes(c)?`<div style="font-size:11px;color:#6a6660;font-style:italic;margin-top:2px">${getNotes(c)}</div>`:''}
+    const popup = `<div>
+      <div class="pp-title">${town} — ${cases.length} case${cases.length>1?'s':''}</div>
+      ${rows}
     </div>`;
-  }).join('');
 
-  tt.innerHTML = `<h3 style="font-size:13px;font-weight:600;margin-bottom:4px;color:#f0ede6">${prov} — ${cs.length} case${cs.length>1?'s':''}</h3>${rows}`;
-  tt.classList.add('show');
-  setTimeout(() => {
-    const tx = er.left - wr.left + 14;
-    const ty = er.top - wr.top - 14;
-    tt.style.left = Math.min(tx, wr.width - tt.offsetWidth - 8) + 'px';
-    tt.style.top = Math.max(4, ty - tt.offsetHeight) + 'px';
-  }, 0);
-  document.addEventListener('click', hideTT, {once:true});
+    // Small jitter if multiple groups land at same exact spot
+    const jLat = coords.lat + (Math.random()-0.5)*0.002;
+    const jLng = coords.lng + (Math.random()-0.5)*0.002;
+
+    const marker = L.marker([jLat, jLng], { icon })
+      .addTo(leafletMap)
+      .bindPopup(popup, { maxWidth: 280, className: 'ahs-popup' });
+
+    // Pulse ring for active cases
+    if (cases.some(c => getStatus(c) === 'active')) {
+      const pulse = L.circleMarker([jLat, jLng], {
+        radius: 18, color, weight: 1.5,
+        fillOpacity: 0, opacity: 0.5,
+        className: 'pulse-ring'
+      }).addTo(leafletMap);
+      mapMarkers.push(pulse);
+    }
+
+    mapMarkers.push(marker);
+  }
+
+  status.textContent = located ? `📍 ${located} location${located>1?'s':''} mapped` : '';
 }
 
-function hideTT() { document.getElementById('tooltip').classList.remove('show'); }
-
-// ══ CASE LIST ══
+// ══ RENDER ALL ══
+function renderAll() {
+  renderSeasonBar();
+  renderProvBar();
+  renderStats();
+  renderMap(); // async — runs in background
+  renderCaseList();
+}
 function renderCaseList() {
   const fc = getFilteredCases();
   const list = document.getElementById('caseList');
